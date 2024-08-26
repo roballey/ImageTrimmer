@@ -4,6 +4,8 @@ environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'  # To stop obnoxious advertising by 
 import pygame, sys, random
 from pygame.locals import *
 import subprocess
+import os
+from PIL import Image
 
 # Allow user to draw a selection box with the mouse then crops image to selection box
 # Based on: https://stackoverflow.com/questions/64716266/how-can-i-make-a-rectangle-selection-tool-in-python-3
@@ -12,6 +14,45 @@ import subprocess
 #        Press left iand hold mouse button on existing (green) top or left borders and drag to resize box then
 #        release.
 #        Press escape to exit, cropped image will be in "crop.jpg"
+
+def crop_images(dir_path,left,top,right,bottom):
+
+    print(f"Left {left}, Top {top}")
+    print(f"Right {right}, Bottom {bottom}")
+
+    # Checks if the provided path is a directory
+    if not os.path.isdir(dir_path):
+        print(f"Error: {dir_path} is not a valid directory.")
+        return
+
+    first=True
+    # Iterates over all files in the directory
+    for filename in os.listdir(dir_path):
+        # Checks if the file has a .jpg or .jpeg extension
+        if filename.lower().endswith('.jpg') or filename.lower().endswith('.jpeg'):
+            # Full path of the file
+            original_path = os.path.join(dir_path, filename)
+            # Path for the converted file
+            cropped_path = os.path.join(dir_path, os.path.splitext(filename)[0] + 'crop.jpg')
+
+            try:
+                with Image.open(original_path) as img:
+                    print(f"Cropping '{original_path}'...", flush=True)
+                    #img.show()
+                    exif = img.getexif()
+
+                    cropped = img.crop((left, top, right, bottom))
+
+                    if first:
+                        first=False
+                        cropped.show()
+
+                    # FIXME: Save cropped files to new directory or move original files
+                    cropped.save(cropped_path, 'JPEG', exif=exif)
+                    print(f"Converted {original_path} to {cropped_path}")
+            except Exception as e:
+                print(f"Error converting {original_path}: {e}")
+
 
 def create_box(p1, p2):
     x1, y1 = min(p1[0], p2[0]), min(p1[1], p2[1])
@@ -35,7 +76,8 @@ BLUE = (0, 0, 255)
 WHITE = (255, 255, 255)
 BACKGROUNDCOLOR = GREEN
 
-img = pygame.image.load("image.jpg").convert()
+# FIXME: Just using hardcoded image file name "test/image.jpg" for now
+img = pygame.image.load("images/image.jpg").convert()
 
 # Make maximum image size slightly smaller than screen size
 maxWidth=infoObject.current_w-200
@@ -79,16 +121,14 @@ while game_loop:
     for event in pygame.event.get():
         # check if user has quit
         if event.type == QUIT:
-            # FIXME: Output cmds for both exits
             pygame.quit()
             sys.exit()
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 if selection_completed:
-                    # FIXME: Use PIL ISO imagemagick convert to crop image
-                    cmd=["convert","-crop", f"+{box_start[0]/scale}+{box_start[1]/scale}", "-crop", f"-{(width-box_end[0])/scale}-{(height-box_end[1])/scale}", "+repage", "image.jpg", "crop.jpg"]
-                    subprocess.call(cmd)
-                    # FIXME: Display cropped image
+                    # FIXME: Confirm user wants to crop all images in directory
+                    # FIXME: For now just using hardcoded directory
+                    crop_images("images", int(box_start[0]/scale),int(box_start[1]/scale),int(box_end[0]/scale),int(box_end[1]/scale))
                 else:
                     print(f"No selection made.")
                 pygame.quit()
@@ -158,7 +198,7 @@ while game_loop:
     elif selection_completed:
         pygame.draw.rect(scrn, GREEN, completed_selection_box, 4)
 
-    # draw the scrn onto the screen
+    # draw onto the screen
     pygame.display.update()
     mainClock.tick(60)
 
